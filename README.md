@@ -1,84 +1,145 @@
-# DevOps Challenge — Product Catalog Microservice
-
-A production-ready microservice deployed on AWS EKS using Terraform, Docker, Jenkins, and CloudWatch.
+Open VS Code, then completely replace your README.md with this content — select all (`Cmd + A`) and paste:
 
 ---
 
-## Architecture Overview
+```markdown
+# 🚀 DevOps Challenge — Product Catalog Microservice
 
-Developer Push → GitHub → Jenkins Pipeline
-│
-┌──────────┼──────────┐
+> Production-ready microservice deployed on AWS EKS using Terraform, Docker, Jenkins CI/CD, and CloudWatch monitoring.
+
+![Infrastructure](https://img.shields.io/badge/IaC-Terraform-purple)
+![Platform](https://img.shields.io/badge/Platform-AWS_EKS-orange)
+![CI/CD](https://img.shields.io/badge/CI%2FCD-Jenkins-red)
+![Container](https://img.shields.io/badge/Container-Docker-blue)
+![Tests](https://img.shields.io/badge/Tests-5_Passing_|_90.9%25_Coverage-brightgreen)
+
+---
+
+## 📐 Architecture Overview
+```
+
+┌─────────────────────────────────────────────────────────────────┐
+│ CI/CD FLOW │
+│ │
+│ Developer │
 │ │ │
-Build Test Push
-(Docker) (Jest) (ECR)
+│ ▼ │
+│ GitHub ──────► Jenkins Pipeline │
+│ │ │
+│ ┌────────────┼────────────┐ │
+│ ▼ ▼ ▼ │
+│ Install Test Build │
+│ (npm) (Jest) (Docker) │
+│ │ │
+│ ▼ │
+│ Push to ECR │
+│ │ │
+│ ▼ │
+│ kubectl set image │
+│ │ │
+└────────────────────────────────────┼────────────────────────────┘
 │
-kubectl apply
-│
-EKS Cluster (us-east-1)
-┌─────────────────────┐
-│ production namespace│
-│ ┌───────┐ ┌───────┐│
-│ │ Pod 1 │ │ Pod 2 ││
-│ └───────┘ └───────┘│
-│ LoadBalancer Service│
-└─────────────────────┘
-│
-CloudWatch
-(Logs + Metrics)
+┌────────────────────────────────────▼────────────────────────────┐
+│ AWS INFRASTRUCTURE │
+│ │
+│ ┌─────────── VPC 10.0.0.0/16 ───────────┐ │
+│ │ │ │
+│ │ us-east-1a us-east-1b │ │
+│ │ ┌────────────┐ ┌────────────┐ │ │
+│ │ │Public /24 │ │Public /24 │ │◄── Internet │
+│ │ │ NAT GW │ │ NAT GW │ │ Gateway │
+│ │ └────────────┘ └────────────┘ │ │
+│ │ ┌────────────┐ ┌────────────┐ │ │
+│ │ │Private /24 │ │Private /24 │ │ │
+│ │ │ EKS Node 1 │ │ EKS Node 2 │ │ │
+│ │ │ t3.medium │ │ t3.medium │ │ │
+│ │ └─────┬──────┘ └─────┬──────┘ │ │
+│ └────────┼────────────────┼──────────────┘ │
+│ └────────┬───────┘ │
+│ ▼ │
+│ ┌─── production namespace ───┐ │
+│ │ ┌─────────┐ ┌─────────┐ │ │
+│ │ │ Pod 1 │ │ Pod 2 │ │◄── HPA (2-6 pods) │
+│ │ │ :3000 │ │ :3000 │ │ scales at 70% CPU │
+│ │ └─────────┘ └─────────┘ │ │
+│ │ LoadBalancer :80 │ │
+│ └────────────────────────────┘ │
+│ │
+│ ECR Repository CloudWatch │
+│ (image storage) (FluentBit → logs) │
+└─────────────────────────────────────────────────────────────────┘
 
-### AWS Resources
-
-- **VPC** — 10.0.0.0/16 with 2 public + 2 private subnets across 2 AZs
-- **EKS** — Kubernetes 1.31, 2x t3.medium worker nodes
-- **ECR** — Private container registry with image scanning enabled
-- **NAT Gateways** — 2x for private subnet internet access
-- **CloudWatch** — FluentBit daemonset for container log aggregation
+```
 
 ---
 
-## Application
+## AWS Resources Provisioned
 
-A Node.js REST API (Product Catalog microservice) built with Express.
-
-### Endpoints
-
-| Method | Path                                  | Description                                          |
-| ------ | ------------------------------------- | ---------------------------------------------------- |
-| GET    | /health                               | Health check (used by EKS liveness/readiness probes) |
-| GET    | /api/v1/products                      | List all products                                    |
-| GET    | /api/v1/products?category=electronics | Filter by category                                   |
-| GET    | /api/v1/products/:id                  | Get product by ID                                    |
+| Resource | Details |
+|---|---|
+| **VPC** | 10.0.0.0/16, DNS enabled |
+| **Subnets** | 2 public + 2 private across us-east-1a and us-east-1b |
+| **Internet Gateway** | Public internet access |
+| **NAT Gateways** | 2x — one per AZ for private subnet egress |
+| **EKS Cluster** | Kubernetes 1.31, API + audit + authenticator logs enabled |
+| **Node Group** | 2x t3.medium (min: 1, max: 4) in private subnets |
+| **ECR Repository** | Private, image scanning on push, lifecycle: keep last 10 |
+| **IAM Roles** | Cluster role + node role with least-privilege policies |
+| **CloudWatch** | FluentBit daemonset shipping container logs |
 
 ---
 
-## Project Structure
+## 📁 Project Structure
+
+```
 
 devops-challenge/
-├── app/ # Node.js microservice
+├── app/
 │ ├── src/
-│ │ ├── index.js # Express server
-│ │ ├── routes/products.js # API routes
-│ │ └── controllers/products.js
-│ ├── tests/products.test.js # Jest tests (5 tests, 90%+ coverage)
-│ ├── Dockerfile # Multi-stage, linux/amd64
+│ │ ├── index.js # Express server + health endpoint
+│ │ ├── routes/products.js # Route definitions
+│ │ └── controllers/products.js # Business logic
+│ ├── tests/
+│ │ └── products.test.js # 5 Jest tests, 90.9% coverage
+│ ├── Dockerfile # Multi-stage, linux/amd64, non-root
+│ ├── .dockerignore
 │ └── package.json
+│
 ├── terraform/
 │ ├── modules/
-│ │ ├── vpc/ # VPC, subnets, NAT, IGW
-│ │ ├── ecr/ # ECR repository + lifecycle policy
-│ │ └── eks/ # EKS cluster + node group + IAM
-│ └── environments/prod/ # Production entry point
+│ │ ├── vpc/ # VPC, subnets, IGW, NAT, route tables
+│ │ ├── ecr/ # ECR repo + lifecycle policy
+│ │ └── eks/ # EKS cluster, node group, IAM roles
+│ └── environments/
+│ └── prod/ # Production entry point
+│ ├── main.tf
+│ ├── variables.tf
+│ └── outputs.tf
+│
 ├── k8s/
-│ ├── namespace.yaml
-│ ├── configmap.yaml
-│ ├── deployment.yaml # 2 replicas, rolling update
-│ ├── service.yaml # LoadBalancer
-│ ├── hpa.yaml # Auto-scales 2-6 pods at 70% CPU
+│ ├── namespace.yaml # production namespace
+│ ├── configmap.yaml # environment variables
+│ ├── deployment.yaml # 2 replicas, rolling update strategy
+│ ├── service.yaml # LoadBalancer on port 80
+│ ├── hpa.yaml # Auto-scale 2–6 pods at 70% CPU
 │ └── monitoring/
 │ └── cloudwatch-configmap.yaml
-├── Jenkinsfile # 7-stage CI/CD pipeline
+│
+├── Jenkinsfile # 7-stage pipeline with auto-rollback
 └── README.md
+
+````
+
+---
+
+## API Endpoints
+
+| Method | Endpoint | Description | Response |
+|---|---|---|---|
+| `GET` | `/health` | Health check — used by EKS liveness + readiness probes | `200 { status: "healthy" }` |
+| `GET` | `/api/v1/products` | List all products | `200 { count, products[] }` |
+| `GET` | `/api/v1/products?category=electronics` | Filter by category | `200 { count, products[] }` |
+| `GET` | `/api/v1/products/:id` | Get single product by ID | `200 product` or `404` |
 
 ---
 
@@ -86,12 +147,14 @@ devops-challenge/
 
 ### Prerequisites
 
-- AWS CLI configured (`aws configure`)
-- Terraform >= 1.0
-- kubectl
-- Docker Desktop
+```bash
+aws --version        # AWS CLI configured with credentials
+terraform --version  # >= 1.0
+kubectl version      # any recent version
+docker --version     # Docker Desktop running
+````
 
-### 1. Provision Infrastructure
+### 1 — Provision Infrastructure
 
 ```bash
 cd terraform/environments/prod
@@ -99,107 +162,181 @@ terraform init
 terraform apply
 ```
 
-### 2. Configure kubectl
+> ⏱ Takes ~15 minutes. Creates VPC, EKS cluster, ECR repo, and all IAM roles.
+
+### 2 — Connect kubectl to EKS
 
 ```bash
 aws eks update-kubeconfig --region us-east-1 --name devops-challenge-eks
+kubectl get nodes   # should show 2x Ready
 ```
 
-### 3. Build and Push Docker Image
+### 3 — Build and Push Docker Image
 
 ```bash
 cd app
 docker buildx build --platform linux/amd64 -t product-catalog:latest --load .
-docker tag product-catalog:latest <ECR_URL>:latest
-aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin <ECR_URL>
-docker push <ECR_URL>:latest
+
+# Tag and push to ECR
+ECR_URL=$(cd ../terraform/environments/prod && terraform output -raw ecr_repository_url)
+docker tag product-catalog:latest $ECR_URL:latest
+aws ecr get-login-password --region us-east-1 | \
+  docker login --username AWS --password-stdin $ECR_URL
+docker push $ECR_URL:latest
 ```
 
-### 4. Deploy to EKS
+### 4 — Deploy Application
 
 ```bash
-kubectl apply -f k8s/
-kubectl apply -f k8s/monitoring/
+cd ..
+kubectl apply -f k8s/namespace.yaml
+kubectl apply -f k8s/configmap.yaml
+kubectl apply -f k8s/deployment.yaml
+kubectl apply -f k8s/service.yaml
+kubectl apply -f k8s/hpa.yaml
 ```
 
-### 5. Verify
+### 5 — Enable CloudWatch Monitoring
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/aws-samples/amazon-cloudwatch-container-insights/latest/k8s-deployment-manifest-templates/deployment-mode/daemonset/container-insights-monitoring/cloudwatch-namespace.yaml
+
+kubectl apply -f k8s/monitoring/cloudwatch-configmap.yaml
+
+kubectl apply -f https://raw.githubusercontent.com/aws-samples/amazon-cloudwatch-container-insights/latest/k8s-deployment-manifest-templates/deployment-mode/daemonset/container-insights-monitoring/fluent-bit/fluent-bit.yaml
+```
+
+### 6 — Verify Everything
 
 ```bash
 kubectl get all -n production
 kubectl get pods -n amazon-cloudwatch
 ```
 
+Expected output:
+
+```
+NAME                                READY   STATUS    RESTARTS
+pod/product-catalog-xxx-xxx         1/1     Running   0
+pod/product-catalog-xxx-xxx         1/1     Running   0
+
+NAME                          TYPE           EXTERNAL-IP
+product-catalog-service       LoadBalancer   xxx.elb.amazonaws.com
+```
+
+### 7 — Teardown (after review)
+
+```bash
+cd terraform/environments/prod
+terraform destroy
+```
+
 ---
 
-## CI/CD Pipeline (Jenkins)
+## 🔄 CI/CD Pipeline (Jenkins)
 
-The Jenkinsfile defines 7 stages:
+The `Jenkinsfile` defines a 7-stage pipeline:
 
-| Stage                | What it does                          |
-| -------------------- | ------------------------------------- |
-| Checkout             | Pulls source code from GitHub         |
-| Install Dependencies | Runs npm install                      |
-| Test                 | Runs Jest tests with coverage         |
-| Build Docker Image   | Multi-stage build for linux/amd64     |
-| Push to ECR          | Authenticates and pushes image        |
-| Deploy to EKS        | Updates deployment, waits for rollout |
-| Verify               | Confirms pods and service status      |
+```
+Checkout → Install → Test → Build Image → Push to ECR → Deploy to EKS → Verify
+```
 
-**Rollback:** If any stage fails, the `post { failure }` block automatically runs `kubectl rollout undo`.
+| Stage                    | Action                                                  |
+| ------------------------ | ------------------------------------------------------- |
+| **Checkout**             | Pulls latest code from GitHub                           |
+| **Install Dependencies** | Runs `npm install`                                      |
+| **Test**                 | Runs Jest with coverage — pipeline fails if tests fail  |
+| **Build Docker Image**   | Multi-stage build targeting `linux/amd64`               |
+| **Push to ECR**          | Authenticates via AWS CLI, pushes with build number tag |
+| **Deploy to EKS**        | `kubectl set image` + waits for rollout to complete     |
+| **Verify**               | Confirms pod and service status post-deploy             |
+
+**Auto-rollback:** The `post { failure }` block runs `kubectl rollout undo` if any stage fails — the previous working version is automatically restored.
 
 ---
 
-## Design Decisions
+## 🏗️ Design Decisions
 
 ### Why EKS over ECS or EC2?
 
-EKS provides full Kubernetes compatibility, making the solution portable across cloud providers. It also enables advanced features like HPA, rolling deployments, and namespace isolation that align with production best practices.
+EKS provides native Kubernetes, meaning the solution is portable across cloud providers (GKE, AKS) without rearchitecting. It also unlocks production features like HPA, rolling deployments with zero downtime, namespace isolation, and fine-grained RBAC — all of which would require significant custom work on EC2.
 
-### Why multi-stage Dockerfile?
+### Why a multi-stage Dockerfile?
 
-Three stages (deps → test → production) ensure:
-
-- Tests run inside the build process — broken code cannot be pushed
-- Production image contains only runtime dependencies (~45MB)
-- Non-root user (`appuser`) reduces security attack surface
+The three-stage build (deps → test → production) enforces a hard rule: **broken code cannot produce a deployable image**. If tests fail in stage 2, the build stops and nothing is pushed to ECR. The final image is ~45MB and runs as a non-root user (`appuser`) — two security best practices for production containers.
 
 ### Why modular Terraform?
 
-Each module (vpc, ecr, eks) is independently reusable. The `environments/prod` directory acts as the entry point, making it trivial to add `environments/staging` later by reusing the same modules with different variables.
+Each module (`vpc`, `ecr`, `eks`) is independently reusable. Adding a staging environment requires only a new `environments/staging/` directory that calls the same modules with different variable values — no code duplication. This follows the DRY principle and mirrors how production Terraform is structured in real teams.
 
-### Why FluentBit over CloudWatch Agent?
+### Why FluentBit over the CloudWatch Agent?
 
-FluentBit is lighter (uses less CPU/memory per node) and is the AWS-recommended solution for EKS log forwarding to CloudWatch.
+FluentBit consumes significantly less CPU and memory per node than the full CloudWatch Agent. It is the AWS-recommended solution for EKS log forwarding and ships as a DaemonSet, ensuring every node's container logs are captured regardless of pod scheduling.
 
----
+### Why Node.js + Express?
 
-## Assumptions
-
-- AWS account has sufficient limits for EKS, NAT Gateways, and EIPs
-- Jenkins server has AWS CLI, Docker, and kubectl installed
-- Jenkins IAM role has permissions for ECR push and EKS deploy
+Lightweight, fast to set up, and immediately testable with Jest and Supertest. The goal of this challenge is to demonstrate DevOps capability, not application complexity — a simple, well-tested service communicates that more clearly than a complex one.
 
 ---
 
-## Known Limitations & Improvements
+## ⚠️ Assumptions
 
-| Limitation                                   | Improvement                                     |
-| -------------------------------------------- | ----------------------------------------------- |
-| LoadBalancer pending (missing LB controller) | Install AWS Load Balancer Controller via Helm   |
-| No Terraform remote state                    | Add S3 backend + DynamoDB state locking         |
-| Jenkins runs locally                         | Deploy Jenkins on EC2 or use EKS-hosted Jenkins |
-| No HTTPS                                     | Add ACM certificate + Route53                   |
-| In-memory data store                         | Replace with RDS or DynamoDB                    |
-| No image vulnerability gate                  | Add ECR scan results check in pipeline          |
+- AWS account has sufficient service limits for EKS, NAT Gateways (2), and EIPs (2)
+- Jenkins server has AWS CLI, Docker (with buildx), and kubectl installed and configured
+- Jenkins execution role has IAM permissions for: `ecr:*`, `eks:DescribeCluster`, and `sts:GetCallerIdentity`
+- `terraform apply` is run by a user with sufficient IAM permissions (AdministratorAccess or equivalent)
 
 ---
 
-## Monitoring
+## 🔧 Known Limitations & Planned Improvements
 
-CloudWatch Container Insights collects:
+| Limitation                  | Root Cause                                 | Improvement                                               |
+| --------------------------- | ------------------------------------------ | --------------------------------------------------------- |
+| LoadBalancer IP pending     | AWS Load Balancer Controller not installed | Install via Helm: `eks/aws-load-balancer-controller`      |
+| No Terraform remote state   | Local state only                           | Add S3 backend + DynamoDB locking in `backend.tf`         |
+| Jenkins runs locally        | No dedicated CI server                     | Deploy Jenkins on EC2 or use a Jenkins EKS pod            |
+| No TLS/HTTPS                | No certificate configured                  | Add ACM certificate + Route53 + ingress controller        |
+| In-memory data store        | Stateless by design for simplicity         | Replace with RDS (PostgreSQL) or DynamoDB                 |
+| No image vulnerability gate | ECR scanning enabled but not blocking      | Add pipeline step: fail build if CRITICAL CVEs found      |
+| Single region               | No disaster recovery                       | Add multi-region replication for ECR and Route53 failover |
 
-- Container logs from all pods in all namespaces
-- Node-level CPU and memory metrics
-- Pod restart and failure events
+---
 
-View logs: **AWS Console → CloudWatch → Log Groups → `/aws/containerinsights/devops-challenge-eks/application`**
+## 📊 Monitoring & Logging
+
+CloudWatch Container Insights is enabled via FluentBit DaemonSet running on all nodes.
+
+**What is collected:**
+
+- All container stdout/stderr logs from every namespace
+- Node-level CPU and memory utilisation
+- Pod restart counts and failure events
+
+**Where to view logs:**
+
+```
+AWS Console → CloudWatch → Log Groups
+→ /aws/containerinsights/devops-challenge-eks/application
+→ /aws/containerinsights/devops-challenge-eks/host
+```
+
+---
+
+## 📋 Test Coverage
+
+```
+File                  | % Stmts | % Branch | % Funcs | % Lines
+----------------------|---------|----------|---------|--------
+src/index.js          |   78.57 |    83.33 |   33.33 |   78.57
+src/controllers/      |     100 |      100 |     100 |     100
+src/routes/           |     100 |      100 |     100 |     100
+----------------------|---------|----------|---------|--------
+All files             |    90.9 |       90 |   71.42 |   90.62
+```
+
+5 tests — Health check, list all products, category filter, get by ID, 404 handling.
+
+```
+
+***
+```
