@@ -321,5 +321,3 @@ All files             |    90.9 |       90 |   71.42 |   90.62
 5 tests — Health check, list all products, category filter, get by ID, 404 handling.
 ```
 
-***
-
