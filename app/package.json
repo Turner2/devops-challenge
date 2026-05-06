@@ -1,0 +1,26 @@
+{
+  "name": "product-catalog",
+  "version": "1.0.0",
+  "description": "Product Catalog microservice - DevOps assessment",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "test": "jest --forceExit --coverage",
+    "test:ci": "jest --forceExit --coverage --ci"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^6.3.4",
+    "nodemon": "^3.0.2"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "coverageThreshold": {
+      "global": { "lines": 80 }
+    }
+  }
+}
