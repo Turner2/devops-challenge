@@ -7,6 +7,18 @@
 ![CI/CD](https://img.shields.io/badge/CI%2FCD-Jenkins-red)
 ![Container](https://img.shields.io/badge/Container-Docker-blue)
 ![Tests](https://img.shields.io/badge/Tests-5_Passing_|_90.9%25_Coverage-brightgreen)
+![Live](https://img.shields.io/badge/Live-ngrok_tunnel-green)
+
+---
+
+## 🌐 Live Endpoints
+
+> The service is deployed and accessible via a public ngrok tunnel (NodePort + port-forward workaround — see [Known Limitations](#known-limitations)).
+
+| Endpoint | URL | Expected Response |
+|---|---|---|
+| **Health Check** | [`https://daybed-portfolio-dumping.ngrok-free.dev/health`](https://daybed-portfolio-dumping.ngrok-free.dev/health) | `200 { status: "healthy" }` |
+| **Products API** | [`https://daybed-portfolio-dumping.ngrok-free.dev/api/v1/products`](https://daybed-portfolio-dumping.ngrok-free.dev/api/v1/products) | `200 { count, products[] }` |
 
 ---
 
@@ -37,7 +49,7 @@
 ┌────────────────────────────────────▼────────────────────────────┐
 │                     AWS INFRASTRUCTURE                          │
 │                                                                 │
-│   ┌─────────── VPC 10.0.0.0/16 ───────────┐                    │
+│   ┌─────────── VPC 10.0.0.0/16 ───────────┐                     │
 │   │                                        │                    │
 │   │  us-east-1a          us-east-1b        │                    │
 │   │  ┌────────────┐   ┌────────────┐       │                    │
@@ -53,15 +65,15 @@
 │            └────────┬───────┘                                   │
 │                     ▼                                           │
 │          ┌─── production namespace ───┐                         │
-│          │  ┌─────────┐ ┌─────────┐  │                         │
-│          │  │  Pod 1  │ │  Pod 2  │  │◄── HPA (2-6 pods)       │
-│          │  │  :3000  │ │  :3000  │  │    scales at 70% CPU    │
-│          │  └─────────┘ └─────────┘  │                         │
-│          │     LoadBalancer :80       │                         │
-│          └────────────────────────────┘                         │
-│                                                                 │
-│   ECR Repository          CloudWatch                            │
-│   (image storage)    (FluentBit → logs)                         │
+│          │  ┌─────────┐ ┌─────────┐  │                          │
+│          │  │  Pod 1  │ │  Pod 2  │  │◄── HPA (2-6 pods)        │
+│          │  │  :3000  │ │  :3000  │  │    scales at 70% CPU     │
+│          │  └─────────┘ └─────────┘  │                          │
+│          │     NodePort :31500        │◄── port-forward :8080   │
+│          └────────────────────────────┘         │               │
+│                                                 ▼               │
+│                                         ngrok tunnel            │
+│                                    (public HTTPS URL)           │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -113,7 +125,7 @@ devops-challenge/
 │   ├── namespace.yaml               # production namespace
 │   ├── configmap.yaml               # environment variables
 │   ├── deployment.yaml              # 2 replicas, rolling update strategy
-│   ├── service.yaml                 # LoadBalancer on port 80
+│   ├── service.yaml                 # NodePort on port 31500
 │   ├── hpa.yaml                     # Auto-scale 2–6 pods at 70% CPU
 │   └── monitoring/
 │       └── cloudwatch-configmap.yaml
@@ -198,7 +210,26 @@ kubectl apply -f k8s/monitoring/cloudwatch-configmap.yaml
 kubectl apply -f https://raw.githubusercontent.com/aws-samples/amazon-cloudwatch-container-insights/latest/k8s-deployment-manifest-templates/deployment-mode/daemonset/container-insights-monitoring/fluent-bit/fluent-bit.yaml
 ```
 
-### 6 — Verify Everything
+### 6 — Expose the Service Publicly (NodePort + ngrok)
+
+> **Note:** The service runs as NodePort (port 31500) due to an AWS account-level ELB restriction on this account. The service is exposed publicly via `kubectl port-forward` + ngrok tunnel.
+
+```bash
+# Terminal 1 — port-forward to the service
+kubectl port-forward svc/product-catalog-service 8080:80 -n production --pod-running-timeout=48h
+
+# Terminal 2 — expose via ngrok
+ngrok config add-authtoken <YOUR_TOKEN>
+ngrok http 8080
+```
+
+The app will be live at your ngrok URL:
+```
+https://<your-ngrok-subdomain>.ngrok-free.dev/health
+https://<your-ngrok-subdomain>.ngrok-free.dev/api/v1/products
+```
+
+### 7 — Verify Everything
 
 ```bash
 kubectl get all -n production
@@ -211,11 +242,11 @@ NAME                                READY   STATUS    RESTARTS
 pod/product-catalog-xxx-xxx         1/1     Running   0
 pod/product-catalog-xxx-xxx         1/1     Running   0
 
-NAME                          TYPE           EXTERNAL-IP
-product-catalog-service       LoadBalancer   xxx.elb.amazonaws.com
+NAME                          TYPE        PORT(S)
+product-catalog-service       NodePort    80:31500/TCP
 ```
 
-### 7 — Teardown (after review)
+### 8 — Teardown (after review)
 
 ```bash
 cd terraform/environments/prod
@@ -276,15 +307,15 @@ Lightweight, fast to set up, and immediately testable with Jest and Supertest. T
 
 ## 🔧 Known Limitations & Planned Improvements
 
-| Limitation | Root Cause | Improvement |
-|---|---|---|
-| LoadBalancer IP pending | AWS Load Balancer Controller not installed | Install via Helm: `eks/aws-load-balancer-controller` |
-| No Terraform remote state | Local state only | Add S3 backend + DynamoDB locking in `backend.tf` |
-| Jenkins runs locally | No dedicated CI server | Deploy Jenkins on EC2 or use a Jenkins EKS pod |
-| No TLS/HTTPS | No certificate configured | Add ACM certificate + Route53 + ingress controller |
-| In-memory data store | Stateless by design for simplicity | Replace with RDS (PostgreSQL) or DynamoDB |
-| No image vulnerability gate | ECR scanning enabled but not blocking | Add pipeline step: fail build if CRITICAL CVEs found |
-| Single region | No disaster recovery | Add multi-region replication for ECR and Route53 failover |
+| Limitation | Root Cause | Current Workaround | Planned Fix |
+|---|---|---|---|
+| **LoadBalancer pending** | AWS account-level ELB restriction (`OperationNotPermitted`) | Service runs as **NodePort :31500**, exposed via `kubectl port-forward` + ngrok | Install AWS Load Balancer Controller via Helm or contact AWS Support to lift restriction |
+| No Terraform remote state | Local state only | — | Add S3 backend + DynamoDB locking in `backend.tf` |
+| Jenkins runs locally | No dedicated CI server | — | Deploy Jenkins on EC2 or as an EKS pod |
+| No TLS/HTTPS on cluster | No certificate configured | ngrok provides HTTPS termination | Add ACM certificate + Route53 + ingress controller |
+| In-memory data store | Stateless by design | — | Replace with RDS (PostgreSQL) or DynamoDB |
+| No image vulnerability gate | ECR scanning enabled but not blocking | — | Add pipeline step: fail build if CRITICAL CVEs found |
+| Single region | No disaster recovery plan | — | Add multi-region ECR replication + Route53 failover |
 
 ---
 
@@ -319,5 +350,4 @@ All files             |    90.9 |       90 |   71.42 |   90.62
 ```
 
 5 tests — Health check, list all products, category filter, get by ID, 404 handling.
-```
-
+````
