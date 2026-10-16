@@ -9,11 +9,16 @@ A small Node.js REST API, deployed to AWS with the full delivery path automated:
 
 After the one-time `scripts/deploy.sh`, there are no manual steps. A `git push` is the deployment.
 
+**Live deployment** (running for the review period; removed afterwards with `scripts/destroy.sh`):
+
 | | |
 |---|---|
-| App | `http://<alb-dns-name>/health`, `/api/v1/products` (URL printed by each Jenkins build) |
-| Jenkins | `http://<jenkins-ip>:8080/job/product-catalog/` (read-only without login) |
+| App | http://product-catalog-prod-1864902970.us-east-1.elb.amazonaws.com/health · [`/api/v1/products`](http://product-catalog-prod-1864902970.us-east-1.elb.amazonaws.com/api/v1/products) |
+| Jenkins pipeline | http://184.196.119.154:8080/job/product-catalog/ (build logs and stage view are readable without logging in) |
+| CloudWatch dashboard | [devops-challenge-prod-product-catalog](https://us-east-1.console.aws.amazon.com/cloudwatch/home?region=us-east-1#dashboards/dashboard/devops-challenge-prod-product-catalog) (needs access to AWS account 647106553909) |
 | Region | us-east-1 |
+
+If these links stop answering, the environment has been torn down; `scripts/deploy.sh` recreates it, and the URLs come from the Terraform outputs and the Jenkins build description.
 
 ---
 
