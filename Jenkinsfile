@@ -130,6 +130,13 @@ pipeline {
         sh '''
           set -eu
           REPO="${ECR_REPOSITORY_URL#*/}"
+          # ECR registers the scan-on-push a few seconds after the push; until then
+          # the waiter fails with ScanNotFoundException instead of waiting.
+          for i in $(seq 1 30); do
+            aws ecr describe-image-scan-findings --region "$AWS_REGION" \
+              --repository-name "$REPO" --image-id imageTag="$IMAGE_TAG" >/dev/null 2>&1 && break
+            echo "Waiting for ECR to start the scan ($i/30)..."; sleep 2
+          done
           aws ecr wait image-scan-complete --region "$AWS_REGION" \
             --repository-name "$REPO" --image-id imageTag="$IMAGE_TAG"
           aws ecr describe-image-scan-findings --region "$AWS_REGION" \
