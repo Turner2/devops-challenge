@@ -146,7 +146,8 @@ pipeline {
           CRITICAL=$(jq '.CRITICAL // 0' scan.json)
           HIGH=$(jq '.HIGH // 0' scan.json)
           if [ "$CRITICAL" -gt 0 ]; then echo "Blocking: $CRITICAL CRITICAL findings"; exit 1; fi
-          if [ "$BLOCK_ON_SEVERITY" = "HIGH" ] && [ "$HIGH" -gt 0 ]; then echo "Blocking: $HIGH HIGH findings"; exit 1; fi
+          # Parameters are unset on a brand-new job's first run, so default to CRITICAL.
+          if [ "${BLOCK_ON_SEVERITY:-CRITICAL}" = "HIGH" ] && [ "$HIGH" -gt 0 ]; then echo "Blocking: $HIGH HIGH findings"; exit 1; fi
           echo "Scan gate passed"
         '''
       }
