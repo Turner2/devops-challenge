@@ -192,6 +192,19 @@ resource "aws_eks_addon" "cloudwatch_observability" {
   resolve_conflicts_on_create = "OVERWRITE"
   resolve_conflicts_on_update = "OVERWRITE"
 
+  # Container Insights only. Application Signals auto-monitor (on by default) injects
+  # an OpenTelemetry init container into every new pod, which the app namespace's
+  # "restricted" Pod Security level rejects, so new pods could never start.
+  configuration_values = jsonencode({
+    manager = {
+      applicationSignals = {
+        autoMonitor = {
+          monitorAllServices = false
+        }
+      }
+    }
+  })
+
   pod_identity_association {
     role_arn        = aws_iam_role.cloudwatch_agent.arn
     service_account = "cloudwatch-agent"
