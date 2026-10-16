@@ -1,33 +1,42 @@
-# ── Stage 1: Install production dependencies ───────────────────
-FROM node:18-alpine AS deps
-WORKDIR /app
-COPY package*.json ./
-RUN npm install --omit=dev
+# syntax=docker/dockerfile:1
 
-# ── Stage 2: Run tests ─────────────────────────────────────────
-FROM node:18-alpine AS test
+# ---- Stage 1: production dependencies only -------------------------------
+FROM node:24-alpine AS deps
 WORKDIR /app
-COPY package*.json ./
-RUN npm install
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
+
+# ---- Stage 2: run the unit tests inside the build -------------------------
+# A failing test fails `docker build`, so a broken image can never be pushed.
+FROM node:24-alpine AS test
+WORKDIR /app
+ENV NODE_ENV=test
+COPY package.json package-lock.json ./
+RUN npm ci
 COPY src/ ./src/
 COPY tests/ ./tests/
 RUN npm run test:ci
 
-# ── Stage 3: Production image ──────────────────────────────────
-FROM node:18-alpine AS production
+# ---- Stage 3: runtime image ----------------------------------------------
+FROM node:24-alpine AS runtime
+ARG APP_VERSION=dev
+ENV NODE_ENV=production \
+    PORT=3000 \
+    APP_VERSION=${APP_VERSION}
 WORKDIR /app
 
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+# Non-root user with a fixed UID so Kubernetes runAsNonRoot can verify it.
+RUN addgroup -S -g 10001 app && adduser -S -u 10001 -G app app
 
-COPY --from=deps /app/node_modules ./node_modules
-COPY src/ ./src/
-COPY package.json ./
+COPY --from=deps --chown=app:app /app/node_modules ./node_modules
+COPY --chown=app:app package.json ./
+COPY --chown=app:app src/ ./src/
 
-USER appuser
-
+USER 10001
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget -qO- http://localhost:3000/health || exit 1
+  CMD wget -qO- http://127.0.0.1:3000/health || exit 1
 
+# Run node directly (not via npm) so SIGTERM reaches the app.
 CMD ["node", "src/index.js"]

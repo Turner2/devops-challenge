@@ -2,53 +2,99 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: product-catalog
-  namespace: production
+  namespace: product-catalog
   labels:
-    app: product-catalog
-    version: "1.0.0"
+    app.kubernetes.io/name: product-catalog
+  annotations:
+    kubernetes.io/change-cause: "IMAGE_TAG_PLACEHOLDER"
 spec:
   replicas: 2
+  revisionHistoryLimit: 10
   selector:
     matchLabels:
-      app: product-catalog
+      app.kubernetes.io/name: product-catalog
   strategy:
     type: RollingUpdate
     rollingUpdate:
       maxSurge: 1
-      maxUnavailable: 0
+      maxUnavailable: 0 # never drop below the desired count during a rollout
   template:
     metadata:
       labels:
-        app: product-catalog
-        version: "1.0.0"
+        app.kubernetes.io/name: product-catalog
+        app.kubernetes.io/version: "IMAGE_TAG_PLACEHOLDER"
     spec:
+      automountServiceAccountToken: false # the app never talks to the Kubernetes API
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      # Spread replicas across AZs and nodes so one failure can't take the service down.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: product-catalog
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: product-catalog
       containers:
         - name: product-catalog
-          image: 378388077304.dkr.ecr.us-east-1.amazonaws.com/devops-challenge-product-catalog:latest
+          image: IMAGE_PLACEHOLDER
+          imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 3000
+            - name: http
+              containerPort: 3000
           envFrom:
             - configMapRef:
                 name: product-catalog-config
+          env:
+            - name: APP_VERSION
+              value: "IMAGE_TAG_PLACEHOLDER"
           resources:
             requests:
-              memory: "128Mi"
-              cpu: "100m"
+              cpu: 100m
+              memory: 128Mi
             limits:
-              memory: "256Mi"
-              cpu: "500m"
+              cpu: 500m
+              memory: 256Mi
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 2
+            failureThreshold: 15
           livenessProbe:
             httpGet:
               path: /health
-              port: 3000
-            initialDelaySeconds: 15
-            periodSeconds: 20
+              port: http
+            periodSeconds: 15
+            timeoutSeconds: 3
             failureThreshold: 3
           readinessProbe:
             httpGet:
-              path: /health
-              port: 3000
-            initialDelaySeconds: 5
-            periodSeconds: 10
-            failureThreshold: 3
-      terminationGracePeriodSeconds: 30
+              path: /ready
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi

@@ -1,8 +1,10 @@
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: product-catalog-hpa
-  namespace: production
+  name: product-catalog
+  namespace: product-catalog
+  labels:
+    app.kubernetes.io/name: product-catalog
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
@@ -17,3 +19,6 @@ spec:
         target:
           type: Utilization
           averageUtilization: 70
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300 # avoid flapping after a short spike

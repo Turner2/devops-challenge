@@ -1,30 +1,29 @@
-const express = require('express');
-const productRoutes = require('./routes/products');
+const app = require('./app');
+const logger = require('./logger');
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT) || 3000;
+// Kubernetes sends SIGTERM, then waits terminationGracePeriodSeconds.
+// We fail readiness first, give the load balancer time to drain, then close.
+const DRAIN_SECONDS = Number(process.env.SHUTDOWN_DRAIN_SECONDS) || 10;
 
-app.use(express.json());
-
-app.get('/health', (req, res) => {
-  res.status(200).json({
-    status: 'healthy',
-    service: 'product-catalog',
-    timestamp: new Date().toISOString(),
-    version: process.env.APP_VERSION || '1.0.0'
-  });
+const server = app.listen(PORT, () => {
+  logger.info('server started', { port: PORT });
 });
 
-app.use('/api/v1/products', productRoutes);
+function shutdown(signal) {
+  if (app.locals.shuttingDown) return;
+  app.locals.shuttingDown = true;
+  logger.info('shutdown requested', { signal, drainSeconds: DRAIN_SECONDS });
 
-app.use((req, res) => {
-  res.status(404).json({ error: 'Route not found' });
-});
-
-if (require.main === module) {
-  app.listen(PORT, () => {
-    console.log(`[product-catalog] Running on port ${PORT}`);
-  });
+  setTimeout(() => {
+    server.close(() => {
+      logger.info('server closed');
+      process.exit(0);
+    });
+    // Hard stop if open connections refuse to close.
+    setTimeout(() => process.exit(1), 5000).unref();
+  }, DRAIN_SECONDS * 1000);
 }
 
-module.exports = app;
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

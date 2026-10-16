@@ -1,7 +1,9 @@
 node_modules/
 coverage/
-tests/
+reports/
 .env
 *.log
 .gitignore
 README.md
+Dockerfile
+.dockerignore

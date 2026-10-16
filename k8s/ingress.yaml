@@ -1,0 +1,33 @@
+# The AWS Load Balancer Controller turns this into an internet-facing
+# Application Load Balancer that sends traffic straight to pod IPs.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: product-catalog
+  namespace: product-catalog
+  labels:
+    app.kubernetes.io/name: product-catalog
+  annotations:
+    alb.ingress.kubernetes.io/load-balancer-name: product-catalog-prod # also used by the CloudWatch dashboard
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    alb.ingress.kubernetes.io/healthcheck-path: /ready
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "10"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "2"
+    # Shorter than the app's 10 s drain, so in-flight requests finish during rollouts.
+    alb.ingress.kubernetes.io/target-group-attributes: deregistration_delay.timeout_seconds=5
+    alb.ingress.kubernetes.io/load-balancer-attributes: routing.http.drop_invalid_header_fields.enabled=true
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: product-catalog
+                port:
+                  name: http

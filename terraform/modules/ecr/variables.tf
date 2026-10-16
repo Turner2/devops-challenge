@@ -1,11 +1,16 @@
-variable "project_name" {
-  type = string
+variable "name" {
+  description = "Repository name."
+  type        = string
 }
 
-variable "service_name" {
-  type = string
+variable "keep_image_count" {
+  description = "How many images to keep. Older ones are expired, leaving enough history to roll back."
+  type        = number
+  default     = 20
 }
 
-variable "environment" {
-  type = string
+variable "force_delete" {
+  description = "Allow `terraform destroy` to delete the repository even if it still has images."
+  type        = bool
+  default     = false
 }

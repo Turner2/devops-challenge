@@ -1,8 +1,21 @@
+# Node
 node_modules/
 coverage/
+reports/
 .env
 *.log
+
+# Terraform
 .terraform/
-terraform.tfstate
-terraform.tfstate.backup
-.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+crash.log
+override.tf
+override.tf.json
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

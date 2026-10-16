@@ -1,0 +1,108 @@
+#!/bin/bash
+# Jenkins controller bootstrap (Amazon Linux 2023). Rendered by Terraform.
+# Progress log: /var/log/jenkins-bootstrap.log
+set -euxo pipefail
+exec > >(tee -a /var/log/jenkins-bootstrap.log) 2>&1
+
+REGION="${region}"
+JENKINS_HOME=/var/lib/jenkins
+PLUGIN_MANAGER_VERSION=2.13.2
+
+# --- Packages: Java 21, Docker, git, jq -----------------------------------
+dnf install -y java-21-amazon-corretto-headless docker git jq unzip fontconfig
+systemctl enable --now docker
+
+# --- Terraform CLI (used by the pipeline's fmt/validate stage; not critical) ---
+install_terraform() {
+  local v
+  v="$(curl -fsSL https://checkpoint-api.hashicorp.com/v1/check/terraform | jq -r .current_version)"
+  curl -fsSL -o /tmp/terraform.zip "https://releases.hashicorp.com/terraform/$v/terraform_$${v}_linux_amd64.zip"
+  unzip -o /tmp/terraform.zip terraform -d /usr/local/bin
+  rm -f /tmp/terraform.zip
+}
+install_terraform || echo "WARNING: Terraform install failed; the validate stage will fail until it is installed"
+
+# --- kubectl matching the cluster's minor version -------------------------
+KUBECTL_VERSION="$(curl -fsSL https://dl.k8s.io/release/stable-${kubernetes_version}.txt)"
+curl -fsSL -o /usr/local/bin/kubectl "https://dl.k8s.io/release/$KUBECTL_VERSION/bin/linux/amd64/kubectl"
+chmod +x /usr/local/bin/kubectl
+
+# --- Jenkins (LTS war, run as a systemd service) --------------------------
+useradd --system --home-dir "$JENKINS_HOME" --create-home --shell /bin/bash jenkins || true
+usermod -aG docker jenkins
+mkdir -p /opt/jenkins /etc/jenkins "$JENKINS_HOME/plugins"
+curl -fsSL -o /opt/jenkins/jenkins.war https://get.jenkins.io/war-stable/latest/jenkins.war
+
+# Plugins (resolved with their dependencies for this Jenkins version)
+curl -fsSL -o /opt/jenkins/plugin-manager.jar \
+  "https://github.com/jenkinsci/plugin-installation-manager-tool/releases/download/$PLUGIN_MANAGER_VERSION/jenkins-plugin-manager-$PLUGIN_MANAGER_VERSION.jar"
+java -jar /opt/jenkins/plugin-manager.jar \
+  --war /opt/jenkins/jenkins.war \
+  --plugin-download-directory "$JENKINS_HOME/plugins" \
+  --plugins \
+    configuration-as-code \
+    job-dsl \
+    workflow-aggregator \
+    git \
+    docker-workflow \
+    pipeline-stage-view \
+    pipeline-utility-steps \
+    timestamper \
+    ws-cleanup \
+    junit \
+    credentials-binding
+
+# Configuration as Code: admin user, security, global env vars and the pipeline job
+cat > /etc/jenkins/casc.yaml <<'CASC'
+${casc_yaml}
+CASC
+
+# Kick off the very first build once Jenkins is up. After that, SCM polling
+# triggers a build on every new commit to the tracked branch.
+mkdir -p "$JENKINS_HOME/init.groovy.d"
+cat > "$JENKINS_HOME/init.groovy.d/first-build.groovy" <<'GROOVY'
+import jenkins.model.Jenkins
+Thread.start {
+  sleep(60000)
+  def job = Jenkins.get().getItemByFullName('product-catalog')
+  if (job != null && job.getLastBuild() == null) {
+    job.scheduleBuild2(0)
+  }
+}
+GROOVY
+
+# Admin password comes from SSM Parameter Store (SecureString), never from user data.
+ADMIN_PASSWORD="$(aws ssm get-parameter --region "$REGION" --name "${admin_password_ssm}" --with-decryption --query Parameter.Value --output text)"
+umask 077
+cat > /etc/jenkins/secrets.env <<EOF
+JENKINS_ADMIN_PASSWORD=$ADMIN_PASSWORD
+EOF
+umask 022
+
+chown -R jenkins:jenkins "$JENKINS_HOME" /etc/jenkins
+chmod 600 /etc/jenkins/secrets.env
+
+cat > /etc/systemd/system/jenkins.service <<'UNIT'
+[Unit]
+Description=Jenkins controller
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=jenkins
+Group=jenkins
+Environment=JENKINS_HOME=/var/lib/jenkins
+Environment=CASC_JENKINS_CONFIG=/etc/jenkins/casc.yaml
+EnvironmentFile=/etc/jenkins/secrets.env
+ExecStart=/usr/bin/java -Djava.awt.headless=true -Djenkins.install.runSetupWizard=false -Xmx1g -jar /opt/jenkins/jenkins.war --httpPort=8080
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+systemctl daemon-reload
+systemctl enable --now jenkins
+echo "Jenkins bootstrap finished"

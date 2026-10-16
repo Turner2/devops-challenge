@@ -1,0 +1,71 @@
+jenkins:
+  systemMessage: "product-catalog CI/CD. Configured by Terraform + Jenkins Configuration as Code. Manual changes are overwritten on rebuild."
+  numExecutors: 2
+  mode: NORMAL
+  slaveAgentPort: -1
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "admin"
+          password: "$${JENKINS_ADMIN_PASSWORD}"
+  # Anyone can view builds and logs (read-only) so reviewers need no account.
+  # Only the logged-in admin can trigger, change or configure anything.
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: true
+  crumbIssuer: "standard"
+  globalNodeProperties:
+    - envVars:
+        env:
+          - key: "AWS_REGION"
+            value: "${region}"
+          - key: "AWS_DEFAULT_REGION"
+            value: "${region}"
+          - key: "ECR_REPOSITORY_URL"
+            value: "${ecr_repository_url}"
+          - key: "EKS_CLUSTER_NAME"
+            value: "${cluster_name}"
+          - key: "K8S_NAMESPACE"
+            value: "${deploy_namespace}"
+
+security:
+  globalJobDslSecurityConfiguration:
+    useScriptSecurity: false
+
+unclassified:
+  location:
+    url: "${jenkins_url}"
+
+jobs:
+  - script: |
+      pipelineJob('product-catalog') {
+        description('Build, test, scan and deploy the product-catalog service to EKS. Defined in the repository Jenkinsfile.')
+        logRotator {
+          numToKeep(30)
+        }
+        properties {
+          disableConcurrentBuilds()
+          pipelineTriggers {
+            triggers {
+              pollSCM {
+                scmpoll_spec('H/2 * * * *')
+              }
+            }
+          }
+        }
+        definition {
+          cpsScm {
+            scm {
+              git {
+                remote {
+                  url('${git_repository_url}')
+                }
+                branch('*/${git_branch}')
+              }
+            }
+            scriptPath('Jenkinsfile')
+            lightweight(true)
+          }
+        }
+      }

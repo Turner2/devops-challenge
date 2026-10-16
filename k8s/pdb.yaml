@@ -1,0 +1,13 @@
+# Keeps at least one pod serving during voluntary disruptions such as node upgrades.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: product-catalog
+  namespace: product-catalog
+  labels:
+    app.kubernetes.io/name: product-catalog
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: product-catalog
