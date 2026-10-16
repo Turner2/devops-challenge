@@ -135,26 +135,26 @@ resource "aws_cloudwatch_dashboard" "this" {
   dashboard_body = jsonencode({
     widgets = [
       {
-        type       = "text"
-        x          = 0
-        y          = 0
-        width      = 24
-        height     = 2
+        type   = "text"
+        x      = 0
+        y      = 0
+        width  = 24
+        height = 2
         properties = {
           markdown = "## ${var.app_name} on ${var.cluster_name}\nTraffic comes through the ALB created by the AWS Load Balancer Controller. Pod and node metrics come from Container Insights. App logs: `${local.app_log_group}`."
         }
       },
       {
-        type       = "metric"
-        x          = 0
-        y          = 2
-        width      = 8
-        height     = 6
+        type   = "metric"
+        x      = 0
+        y      = 2
+        width  = 8
+        height = 6
         properties = {
-          title   = "ALB requests and 5xx"
-          region  = data.aws_region.current.region
-          stat    = "Sum"
-          period  = 60
+          title  = "ALB requests and 5xx"
+          region = data.aws_region.current.region
+          stat   = "Sum"
+          period = 60
           metrics = [
             [{ expression = "SEARCH('{AWS/ApplicationELB,LoadBalancer} MetricName=\"RequestCount\" ${var.alb_name}', 'Sum', 60)", id = "req", label = "Requests" }],
             [{ expression = "SEARCH('{AWS/ApplicationELB,LoadBalancer} MetricName=\"HTTPCode_Target_5XX_Count\" ${var.alb_name}', 'Sum', 60)", id = "err", label = "Target 5xx" }],
@@ -162,30 +162,30 @@ resource "aws_cloudwatch_dashboard" "this" {
         }
       },
       {
-        type       = "metric"
-        x          = 8
-        y          = 2
-        width      = 8
-        height     = 6
+        type   = "metric"
+        x      = 8
+        y      = 2
+        width  = 8
+        height = 6
         properties = {
-          title   = "ALB target response time (p95, seconds)"
-          region  = data.aws_region.current.region
-          period  = 60
+          title  = "ALB target response time (p95, seconds)"
+          region = data.aws_region.current.region
+          period = 60
           metrics = [
             [{ expression = "SEARCH('{AWS/ApplicationELB,LoadBalancer} MetricName=\"TargetResponseTime\" ${var.alb_name}', 'p95', 60)", id = "lat", label = "p95" }],
           ]
         }
       },
       {
-        type       = "metric"
-        x          = 16
-        y          = 2
-        width      = 8
-        height     = 6
+        type   = "metric"
+        x      = 16
+        y      = 2
+        width  = 8
+        height = 6
         properties = {
-          title   = "Running pods and restarts"
-          region  = data.aws_region.current.region
-          period  = 60
+          title  = "Running pods and restarts"
+          region = data.aws_region.current.region
+          period = 60
           metrics = [
             [local.ci, "service_number_of_running_pods", "ClusterName", var.cluster_name, "Namespace", var.namespace, "Service", var.service_name, { stat = "Minimum", label = "Running pods" }],
             [local.ci, "pod_number_of_container_restarts", "ClusterName", var.cluster_name, "Namespace", var.namespace, "PodName", var.app_name, { stat = "Maximum", label = "Container restarts" }],
@@ -193,16 +193,16 @@ resource "aws_cloudwatch_dashboard" "this" {
         }
       },
       {
-        type       = "metric"
-        x          = 0
-        y          = 8
-        width      = 12
-        height     = 6
+        type   = "metric"
+        x      = 0
+        y      = 8
+        width  = 12
+        height = 6
         properties = {
-          title   = "Pod CPU and memory (% of limit)"
-          region  = data.aws_region.current.region
-          stat    = "Average"
-          period  = 60
+          title  = "Pod CPU and memory (% of limit)"
+          region = data.aws_region.current.region
+          stat   = "Average"
+          period = 60
           metrics = [
             [local.ci, "pod_cpu_utilization_over_pod_limit", "ClusterName", var.cluster_name, "Namespace", var.namespace, "PodName", var.app_name, { label = "CPU % of limit" }],
             [local.ci, "pod_memory_utilization_over_pod_limit", "ClusterName", var.cluster_name, "Namespace", var.namespace, "PodName", var.app_name, { label = "Memory % of limit" }],
@@ -211,16 +211,16 @@ resource "aws_cloudwatch_dashboard" "this" {
         }
       },
       {
-        type       = "metric"
-        x          = 12
-        y          = 8
-        width      = 12
-        height     = 6
+        type   = "metric"
+        x      = 12
+        y      = 8
+        width  = 12
+        height = 6
         properties = {
-          title   = "Nodes: CPU, memory and count"
-          region  = data.aws_region.current.region
-          stat    = "Average"
-          period  = 60
+          title  = "Nodes: CPU, memory and count"
+          region = data.aws_region.current.region
+          stat   = "Average"
+          period = 60
           metrics = [
             [local.ci, "node_cpu_utilization", "ClusterName", var.cluster_name, { label = "Node CPU %" }],
             [local.ci, "node_memory_utilization", "ClusterName", var.cluster_name, { label = "Node memory %" }],
@@ -229,11 +229,11 @@ resource "aws_cloudwatch_dashboard" "this" {
         }
       },
       {
-        type       = "log"
-        x          = 0
-        y          = 14
-        width      = 24
-        height     = 6
+        type   = "log"
+        x      = 0
+        y      = 14
+        width  = 24
+        height = 6
         properties = {
           title  = "Recent application errors"
           region = data.aws_region.current.region
@@ -242,13 +242,13 @@ resource "aws_cloudwatch_dashboard" "this" {
         }
       },
       {
-        type       = "alarm"
-        x          = 0
-        y          = 20
-        width      = 24
-        height     = 3
+        type   = "alarm"
+        x      = 0
+        y      = 20
+        width  = 24
+        height = 3
         properties = {
-          title  = "Alarms"
+          title = "Alarms"
           alarms = [
             aws_cloudwatch_metric_alarm.running_pods_low.arn,
             aws_cloudwatch_metric_alarm.container_restarts.arn,

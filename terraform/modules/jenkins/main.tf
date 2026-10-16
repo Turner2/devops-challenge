@@ -76,9 +76,9 @@ resource "aws_eip" "jenkins" {
 # IAM: least privilege for build, push and deploy
 # ---------------------------------------------------------------------------
 resource "aws_iam_role" "jenkins" {
-  name               = "${var.name}-jenkins"
+  name = "${var.name}-jenkins"
   assume_role_policy = jsonencode({
-    Version   = "2012-10-17"
+    Version = "2012-10-17"
     Statement = [{
       Effect    = "Allow"
       Principal = { Service = "ec2.amazonaws.com" }
@@ -93,10 +93,10 @@ resource "aws_iam_role_policy_attachment" "ssm" {
 }
 
 resource "aws_iam_role_policy" "pipeline" {
-  name   = "pipeline"
-  role   = aws_iam_role.jenkins.id
+  name = "pipeline"
+  role = aws_iam_role.jenkins.id
   policy = jsonencode({
-    Version   = "2012-10-17"
+    Version = "2012-10-17"
     Statement = [
       {
         Sid      = "EcrLogin"
@@ -183,11 +183,11 @@ resource "aws_instance" "jenkins" {
   }
 
   user_data_replace_on_change = true
-  user_data                   = templatefile("${path.module}/templates/user-data.sh.tftpl", {
+  user_data = templatefile("${path.module}/templates/user-data.sh.tftpl", {
     region             = data.aws_region.current.region
     admin_password_ssm = aws_ssm_parameter.admin_password.name
     kubernetes_version = var.kubernetes_version
-    casc_yaml          = templatefile("${path.module}/templates/casc.yaml.tftpl", {
+    casc_yaml = templatefile("${path.module}/templates/casc.yaml.tftpl", {
       jenkins_url        = "http://${aws_eip.jenkins.public_ip}:8080/"
       git_repository_url = var.git_repository_url
       git_branch         = var.git_branch

@@ -31,9 +31,9 @@ resource "aws_cloudwatch_log_group" "control_plane" {
 # Control plane
 # ---------------------------------------------------------------------------
 resource "aws_iam_role" "cluster" {
-  name               = "${var.cluster_name}-cluster"
+  name = "${var.cluster_name}-cluster"
   assume_role_policy = jsonencode({
-    Version   = "2012-10-17"
+    Version = "2012-10-17"
     Statement = [{
       Effect    = "Allow"
       Principal = { Service = "eks.amazonaws.com" }
@@ -89,9 +89,9 @@ resource "aws_eks_cluster" "this" {
 # Worker nodes
 # ---------------------------------------------------------------------------
 resource "aws_iam_role" "node" {
-  name               = "${var.cluster_name}-node"
+  name = "${var.cluster_name}-node"
   assume_role_policy = jsonencode({
-    Version   = "2012-10-17"
+    Version = "2012-10-17"
     Statement = [{
       Effect    = "Allow"
       Principal = { Service = "ec2.amazonaws.com" }

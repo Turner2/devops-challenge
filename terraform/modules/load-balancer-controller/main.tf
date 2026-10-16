@@ -55,10 +55,10 @@ resource "helm_release" "this" {
   timeout = 600
 
   values = [yamlencode({
-    clusterName    = var.cluster_name
-    region         = var.region
-    vpcId          = var.vpc_id
-    replicaCount   = 2
+    clusterName  = var.cluster_name
+    region       = var.region
+    vpcId        = var.vpc_id
+    replicaCount = 2
     serviceAccount = {
       create = true
       name   = local.service_account

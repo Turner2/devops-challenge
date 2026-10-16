@@ -60,7 +60,7 @@ module "load_balancer_controller" {
 # The namespace is owned by Terraform so Jenkins can be limited to it.
 resource "kubernetes_namespace_v1" "app" {
   metadata {
-    name   = var.app_namespace
+    name = var.app_namespace
     labels = {
       "app.kubernetes.io/part-of"          = var.project_name
       "pod-security.kubernetes.io/enforce" = "restricted"
