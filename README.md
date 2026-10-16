@@ -42,8 +42,6 @@ If these links stop answering, the environment has been torn down; `scripts/depl
 
 ![Architecture diagram](docs/architecture.png)
 
-The editable source is [`docs/architecture.drawio`](docs/architecture.drawio) (open it at [app.diagrams.net](https://app.diagrams.net)).
-
 ### Request path
 
 `User → Internet gateway → Application Load Balancer (public subnets) → pod IPs on port 3000 (private subnets)`
