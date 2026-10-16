@@ -102,5 +102,7 @@ module "jenkins" {
   alarm_topic_arns          = [module.monitoring.alarm_topic_arn]
 
   # Start Jenkins last, so its first automatic build finds a ready cluster and ALB controller.
-  depends_on = [module.load_balancer_controller]
+  # Passed as a value rather than a module-level depends_on: that would defer the
+  # module's data sources on every cluster change and force a Jenkins rebuild.
+  wait_for = module.load_balancer_controller.release_status
 }

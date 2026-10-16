@@ -164,6 +164,11 @@ resource "aws_eks_access_policy_association" "jenkins" {
 # ---------------------------------------------------------------------------
 # Instance
 # ---------------------------------------------------------------------------
+# Orders the instance after var.wait_for without a module-level depends_on.
+resource "terraform_data" "wait_for" {
+  input = var.wait_for
+}
+
 resource "aws_instance" "jenkins" {
   ami                    = data.aws_ssm_parameter.al2023.value
   instance_type          = var.instance_type
@@ -204,7 +209,7 @@ resource "aws_instance" "jenkins" {
     ignore_changes = [ami] # don't rebuild Jenkins every time a new AMI is published
   }
 
-  depends_on = [aws_iam_role_policy.pipeline]
+  depends_on = [aws_iam_role_policy.pipeline, terraform_data.wait_for]
 }
 
 resource "aws_eip_association" "jenkins" {

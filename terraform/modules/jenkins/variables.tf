@@ -71,3 +71,9 @@ variable "alarm_topic_arns" {
   type    = list(string)
   default = []
 }
+
+variable "wait_for" {
+  description = "Any value from a resource Jenkins must start after (e.g. the load balancer controller release)."
+  type        = any
+  default     = null
+}

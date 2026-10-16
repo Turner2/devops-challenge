@@ -23,6 +23,13 @@ spec:
       labels:
         app.kubernetes.io/name: product-catalog
         app.kubernetes.io/version: "IMAGE_TAG_PLACEHOLDER"
+      annotations:
+        # Opt out of CloudWatch Application Signals auto-instrumentation. Its injected
+        # init container breaks the namespace's "restricted" Pod Security level.
+        instrumentation.opentelemetry.io/inject-java: "false"
+        instrumentation.opentelemetry.io/inject-nodejs: "false"
+        instrumentation.opentelemetry.io/inject-python: "false"
+        instrumentation.opentelemetry.io/inject-dotnet: "false"
     spec:
       automountServiceAccountToken: false # the app never talks to the Kubernetes API
       terminationGracePeriodSeconds: 30
