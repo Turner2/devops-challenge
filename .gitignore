@@ -19,3 +19,6 @@ override.tf.json
 .DS_Store
 .idea/
 .vscode/
+
+# Lock files belong to root stacks only, not reusable modules
+terraform/modules/**/.terraform.lock.hcl
